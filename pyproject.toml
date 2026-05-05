@@ -1,0 +1,32 @@
+[project]
+name = "synthetic-data-gen"
+version = "1.0.0"
+description = "5-Agent pipeline for synthetic chatbot training data generation using LangGraph + LangChain + Azure OpenAI"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "aiofiles>=25.1.0",
+    "faiss-cpu>=1.13.0",
+    "fastapi>=0.136.1",
+    "httpx>=0.28.1",
+    "langchain>=1.2.17",
+    "langchain-community>=0.4.1",
+    "langchain-openai>=1.2.1",
+    "langgraph>=0.4.0",
+    "nltk>=3.9.0",
+    "numpy>=2.0.0",
+    "openai>=2.33.0",
+    "openpyxl>=3.1.0",
+    "pydantic>=2.13.3",
+    "pydantic-settings>=2.14.0",
+    "pymupdf>=1.25.0",
+    "python-docx>=1.2.0",
+    "python-dotenv>=1.2.2",
+    "python-multipart>=0.0.27",
+    "rank-bm25>=0.2.2",
+    "tenacity>=9.1.4",
+    "uvicorn>=0.46.0",
+]
+
+[project.scripts]
+serve = "uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"

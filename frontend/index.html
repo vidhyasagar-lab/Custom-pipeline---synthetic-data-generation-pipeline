@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SynthGen Studio</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <div class="app" id="app">
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-brand">
+                <div class="brand-icon">
+                    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                </div>
+                <div class="brand-text">
+                    <span class="brand-name">SynthGen</span>
+                    <span class="brand-sub">Studio</span>
+                </div>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="#dashboard" class="nav-item active" data-page="dashboard">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+                    <span>Dashboard</span>
+                </a>
+                <a href="#generate" class="nav-item" data-page="generate">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                    <span>Generate</span>
+                </a>
+                <a href="#results" class="nav-item" data-page="results">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+                    <span>Results</span>
+                </a>
+                <a href="#experiments" class="nav-item" data-page="experiments">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6v7l4 8H5l4-8V3z"/><line x1="8" y1="21" x2="16" y2="21"/></svg>
+                    <span>Experiments</span>
+                </a>
+            </nav>
+            <div class="sidebar-footer">
+                <div class="health-badge" id="healthBadge">
+                    <span class="health-dot"></span>
+                    <span class="health-label">Checking...</span>
+                </div>
+                <div class="sidebar-version">v2.0</div>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <div class="main-wrapper">
+            <header class="topbar">
+                <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Toggle menu">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+                </button>
+                <h1 class="topbar-title" id="topbarTitle">Dashboard</h1>
+                <div class="topbar-actions">
+                    <div class="run-indicator" id="runIndicator" style="display:none">
+                        <span class="run-pulse"></span>
+                        <span>Pipeline Running</span>
+                    </div>
+                </div>
+            </header>
+
+            <div class="main-content">
+                <!-- ═══ DASHBOARD ═══ -->
+                <div id="page-dashboard" class="page active">
+                    <div class="page-hero">
+                        <div class="hero-text">
+                            <h2>Welcome to SynthGen Studio</h2>
+                            <p>Generate high-quality synthetic QA training data from your documents using a multi-agent LangGraph pipeline with RAGAS-inspired validation.</p>
+                        </div>
+                        <button class="btn btn-primary btn-lg" onclick="navigateTo('generate')">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                            New Generation
+                        </button>
+                    </div>
+                    <div class="stats-grid" id="dashboardStats">
+                        <div class="stat-card"><div class="stat-icon si-accent"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div><div class="stat-info"><span class="stat-value" id="statRuns">0</span><span class="stat-label">Total Runs</span></div></div>
+                        <div class="stat-card"><div class="stat-icon si-blue"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div><div class="stat-info"><span class="stat-value" id="statConversations">0</span><span class="stat-label">Conversations</span></div></div>
+                        <div class="stat-card"><div class="stat-icon si-green"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div><div class="stat-info"><span class="stat-value" id="statQuality">&mdash;</span><span class="stat-label">Avg Quality</span></div></div>
+                        <div class="stat-card"><div class="stat-icon si-amber"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div><div class="stat-info"><span class="stat-value" id="statDocs">0</span><span class="stat-label">Documents</span></div></div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header"><h3>Recent Runs</h3><button class="btn btn-ghost btn-sm" onclick="clearRunHistory()" title="Clear history"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button></div>
+                        <div class="card-body" id="recentRunsBody">
+                            <div class="empty-state"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><p>No runs yet. Start your first generation!</p></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ═══ GENERATE ═══ -->
+                <div id="page-generate" class="page">
+                    <div class="generate-grid">
+                        <div class="generate-left">
+                            <div class="card">
+                                <div class="card-header"><h3>Upload Documents</h3></div>
+                                <div class="card-body">
+                                    <div class="dropzone" id="dropzone">
+                                        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                                        <p class="dropzone-text">Drop <strong>.docx</strong> or <strong>.pdf</strong> files here</p>
+                                        <p class="dropzone-hint">or click to browse</p>
+                                        <input type="file" id="fileInput" accept=".docx,.pdf" hidden multiple>
+                                    </div>
+                                    <div class="file-list" id="fileList"></div>
+                                </div>
+                            </div>
+                            <div class="card">
+                                <div class="card-header"><h3>Configuration</h3></div>
+                                <div class="card-body">
+                                    <div class="form-grid">
+                                        <div class="form-group">
+                                            <label>Quality Threshold</label>
+                                            <div class="range-row"><input type="range" id="cfgQuality" min="0.3" max="1.0" step="0.05" value="0.7"><span class="range-value" id="cfgQualityVal">0.70</span></div>
+                                            <span class="form-hint">Minimum score to pass validation</span>
+                                        </div>
+                                        <div class="form-group">
+                                            <label>Max Retries</label>
+                                            <input type="number" id="cfgRetries" class="form-input" value="3" min="1" max="10">
+                                            <span class="form-hint">Borderline retry attempts</span>
+                                        </div>
+                                    </div>
+                                    <div class="toggle-grid">
+                                        <label class="toggle-label"><span>Multi-Hop</span><div class="toggle-switch"><input type="checkbox" id="cfgMultihop" checked><span class="toggle-slider"></span></div></label>
+                                        <label class="toggle-label"><span>Knowledge Graph</span><div class="toggle-switch"><input type="checkbox" id="cfgKG" checked><span class="toggle-slider"></span></div></label>
+                                        <label class="toggle-label"><span>Advanced Metrics</span><div class="toggle-switch"><input type="checkbox" id="cfgMetrics" checked><span class="toggle-slider"></span></div></label>
+                                    </div>
+                                    <details class="advanced-section">
+                                        <summary class="advanced-toggle"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c.26.604.852.997 1.51 1H21a2 2 0 1 1 0 4h-.09c-.658.003-1.25.396-1.51 1z"/></svg> Advanced Options</summary>
+                                        <div class="advanced-body">
+                                            <div class="form-group"><label>Experiment Name</label><input type="text" id="cfgExperiment" class="form-input" placeholder="e.g. baseline-v2"><span class="form-hint">Optional name for tracking</span></div>
+                                            <div class="form-group"><label>Personas</label><div class="chip-group" id="personaChips"><button class="chip active" data-value="beginner">Beginner</button><button class="chip active" data-value="expert">Expert</button><button class="chip active" data-value="impatient">Impatient</button><button class="chip active" data-value="curious_student">Student</button><button class="chip active" data-value="non_native_speaker">Non-Native</button></div><span class="form-hint">Toggle personas for query diversity</span></div>
+                                            <div class="form-group"><label>Query Styles</label><div class="chip-group" id="styleChips"><button class="chip active" data-value="conversational">Conversational</button><button class="chip active" data-value="web_search">Web Search</button><button class="chip active" data-value="formal">Formal</button></div></div>
+                                        </div>
+                                    </details>
+                                </div>
+                            </div>
+                            <button class="btn btn-primary btn-xl btn-run" id="runBtn" disabled><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg><span id="runBtnText">Start Generation</span></button>
+                        </div>
+                        <div class="generate-right">
+                            <div class="card" id="pipelineCard">
+                                <div class="card-header"><h3>Pipeline</h3><span class="badge badge-muted" id="pipelineStatus">Idle</span></div>
+                                <div class="card-body">
+                                    <div class="pipeline-steps" id="pipelineSteps">
+                                        <div class="p-step" data-step="1"><div class="p-step-dot"></div><div class="p-step-info"><span class="p-step-name">Semantic Chunking</span><span class="p-step-meta"></span></div></div>
+                                        <div class="p-step" data-step="2"><div class="p-step-dot"></div><div class="p-step-info"><span class="p-step-name">Knowledge Graph</span><span class="p-step-meta"></span></div></div>
+                                        <div class="p-step" data-step="3"><div class="p-step-dot"></div><div class="p-step-info"><span class="p-step-name">Question Generation</span><span class="p-step-meta"></span></div></div>
+                                        <div class="p-step" data-step="4"><div class="p-step-dot"></div><div class="p-step-info"><span class="p-step-name">Multi-Hop Generation</span><span class="p-step-meta"></span></div></div>
+                                        <div class="p-step" data-step="5"><div class="p-step-dot"></div><div class="p-step-info"><span class="p-step-name">Deduplication</span><span class="p-step-meta"></span></div></div>
+                                        <div class="p-step" data-step="6"><div class="p-step-dot"></div><div class="p-step-info"><span class="p-step-name">Answer Generation</span><span class="p-step-meta"></span></div></div>
+                                        <div class="p-step" data-step="7"><div class="p-step-dot"></div><div class="p-step-info"><span class="p-step-name">Quality Validation</span><span class="p-step-meta"></span></div></div>
+                                    </div>
+                                    <div class="progress-bar-wrap" id="progressWrap" style="display:none"><div class="progress-track"><div class="progress-fill" id="progressFill"></div></div><span class="progress-pct" id="progressPct">0%</span></div>
+                                </div>
+                            </div>
+                            <div class="card terminal-card">
+                                <div class="card-header"><h3>Live Logs</h3><button class="btn btn-ghost btn-sm" id="clearLogsBtn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button></div>
+                                <div class="terminal" id="terminal"><div class="terminal-line muted">Waiting for pipeline to start...</div></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ═══ RESULTS ═══ -->
+                <div id="page-results" class="page">
+                    <div class="results-topbar">
+                        <select id="runSelector" class="form-select"><option value="">Select a run...</option></select>
+                        <div class="results-actions" id="resultsActions" style="display:none">
+                            <button class="btn btn-outline btn-sm" id="exportJsonBtn"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> JSON</button>
+                            <button class="btn btn-primary btn-sm" id="exportExcelBtn"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Excel</button>
+                        </div>
+                    </div>
+                    <div id="resultsContent" style="display:none">
+                        <div class="stats-grid stats-6" id="resultsStats"></div>
+                        <div class="charts-grid">
+                            <div class="card"><div class="card-header"><h3>Quality Breakdown</h3></div><div class="card-body chart-body"><canvas id="qualityChart"></canvas></div></div>
+                            <div class="card"><div class="card-header"><h3>Question Types</h3></div><div class="card-body chart-body"><canvas id="typeChart"></canvas></div></div>
+                        </div>
+                        <div class="card" id="advMetricsCard" style="display:none"><div class="card-header"><h3>Advanced Metrics <span class="badge badge-accent">RAGAS</span></h3></div><div class="card-body"><div class="adv-metrics-grid" id="advMetricsGrid"></div></div></div>
+                        <div class="info-row">
+                            <div class="card" id="kgCard" style="display:none"><div class="card-header"><h3>Knowledge Graph</h3></div><div class="card-body" id="kgBody"></div></div>
+                            <div class="card" id="costCard" style="display:none"><div class="card-header"><h3>Cost Summary</h3></div><div class="card-body" id="costBody"></div></div>
+                        </div>
+                        <div class="card">
+                            <div class="card-header"><h3>Conversations <span class="badge badge-muted" id="convCount">0</span></h3><div class="table-search-wrap"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input type="text" id="tableSearch" placeholder="Search..." class="search-input"></div></div>
+                            <div class="table-wrap"><table class="data-table"><thead><tr><th width="40">#</th><th>Question</th><th>Answer</th><th width="80">Type</th><th width="70">Score</th></tr></thead><tbody id="convBody"></tbody></table></div>
+                            <div class="table-footer" id="tableFooter"></div>
+                        </div>
+                    </div>
+                    <div id="resultsEmpty" class="empty-page"><svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="1.5"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg><h3>No Results Yet</h3><p>Run a generation pipeline to see results here.</p><button class="btn btn-primary" onclick="navigateTo('generate')">Go to Generate</button></div>
+                </div>
+
+                <!-- ═══ EXPERIMENTS ═══ -->
+                <div id="page-experiments" class="page">
+                    <div class="card"><div class="card-header"><h3>Experiment History</h3><button class="btn btn-outline btn-sm" id="refreshExpBtn"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg> Refresh</button></div><div class="card-body" id="expBody"><div class="empty-state"><p>No experiments recorded yet.</p></div></div></div>
+                    <div class="card" id="compareCard" style="display:none"><div class="card-header"><h3>Comparison</h3><button class="btn btn-ghost btn-sm" onclick="document.getElementById('compareCard').style.display='none'"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div><div class="card-body" id="compareBody"></div></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="toastContainer" class="toast-container"></div>
+    <div class="modal-overlay" id="modalOverlay"><div class="modal" id="modalContent"></div></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+    <script src="/static/app.js"></script>
+</body>
+</html>

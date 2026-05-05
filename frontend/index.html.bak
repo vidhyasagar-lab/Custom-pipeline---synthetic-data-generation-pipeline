@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Synthetic Data Generation Pipeline</title>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <h1>Synthetic Data Generator</h1>
+                <p class="subtitle">Custom 5-Agent LangGraph Pipeline — Chatbot Training Data</p>
+            </div>
+            <div class="health-indicator" id="healthIndicator">
+                <span class="health-dot"></span>
+                <span class="health-text">Checking...</span>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Step 1: Upload -->
+            <section class="card" id="uploadSection">
+                <div class="card-header">
+                    <span class="step-badge">1</span>
+                    <h2>Upload Document</h2>
+                </div>
+                <div class="card-body">
+                    <div class="upload-zone" id="uploadZone">
+                        <div class="upload-icon">📄</div>
+                        <p class="upload-text">Drag & drop <strong>.docx / .pdf</strong> file(s) here</p>
+                        <p class="upload-subtext">or click to browse — supports multiple files for cross-document retrieval</p>
+                        <input type="file" id="fileInput" accept=".docx,.pdf" hidden multiple>
+                    </div>
+                    <div class="file-info" id="fileInfo" style="display:none;">
+                        <div class="file-details">
+                            <span class="file-icon">✅</span>
+                            <span class="file-name" id="fileName"></span>
+                            <span class="file-size" id="fileSize"></span>
+                        </div>
+                        <button class="btn btn-sm btn-outline" id="removeFile">Remove</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Step 2: Configure -->
+            <section class="card" id="configSection">
+                <div class="card-header">
+                    <span class="step-badge">2</span>
+                    <h2>Configure Pipeline</h2>
+                </div>
+                <div class="card-body">
+                    <div class="config-grid">
+                        <div class="config-field">
+                            <label for="testsetSize">Generation Mode</label>
+                            <input type="text" id="testsetSize" value="Exhaustive" disabled>
+                            <span class="field-hint">Generates all possible QA pairs per chunk</span>
+                        </div>
+                        <div class="config-field">
+                            <label for="qualityThreshold">Quality Threshold</label>
+                            <input type="number" id="qualityThreshold" value="0.7" min="0.1" max="1.0" step="0.05">
+                            <span class="field-hint">Minimum quality score (0.0 - 1.0)</span>
+                        </div>
+                        <div class="config-field">
+                            <label for="maxRetries">Max Retries</label>
+                            <input type="number" id="maxRetries" value="3" min="1" max="10">
+                            <span class="field-hint">Feedback loop retry limit</span>
+                        </div>
+
+                    </div>
+                    <div class="card-actions">
+                        <button class="btn btn-primary btn-lg" id="startBtn" disabled>
+                            Start Generation
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Step 3: Progress -->
+            <section class="card" id="progressSection" style="display:none;">
+                <div class="card-header">
+                    <span class="step-badge active">3</span>
+                    <h2>Pipeline Progress</h2>
+                    <span class="run-id" id="runIdDisplay"></span>
+                </div>
+                <div class="card-body">
+                    <!-- Progress bar -->
+                    <div class="progress-container">
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progressFill"></div>
+                        </div>
+                        <span class="progress-text" id="progressText">0%</span>
+                    </div>
+
+                    <!-- Pipeline stages -->
+                    <div class="pipeline-stages" id="pipelineStages">
+                        <div class="stage" data-phase="1">
+                            <div class="stage-indicator"></div>
+                            <div class="stage-info">
+                                <span class="stage-name">Semantic Chunking</span>
+                                <span class="stage-status">Waiting...</span>
+                            </div>
+                        </div>
+                        <div class="stage" data-phase="2">
+                            <div class="stage-indicator"></div>
+                            <div class="stage-info">
+                                <span class="stage-name">Question Generation</span>
+                                <span class="stage-status">Waiting...</span>
+                            </div>
+                        </div>
+                        <div class="stage" data-phase="3">
+                            <div class="stage-indicator"></div>
+                            <div class="stage-info">
+                                <span class="stage-name">Answer Generation (RAG)</span>
+                                <span class="stage-status">Waiting...</span>
+                            </div>
+                        </div>
+                        <div class="stage" data-phase="4">
+                            <div class="stage-indicator"></div>
+                            <div class="stage-info">
+                                <span class="stage-name">Deduplication</span>
+                                <span class="stage-status">Waiting...</span>
+                            </div>
+                        </div>
+                        <div class="stage" data-phase="5">
+                            <div class="stage-indicator"></div>
+                            <div class="stage-info">
+                                <span class="stage-name">Quality Validation</span>
+                                <span class="stage-status">Waiting...</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Live log -->
+                    <div class="log-container">
+                        <div class="log-header">
+                            <span>Live Logs</span>
+                            <button class="btn btn-sm btn-ghost" id="clearLogs">Clear</button>
+                        </div>
+                        <div class="log-output" id="logOutput"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Step 4: Results -->
+            <section class="card" id="resultsSection" style="display:none;">
+                <div class="card-header">
+                    <span class="step-badge completed">4</span>
+                    <h2>Results</h2>
+                </div>
+                <div class="card-body">
+                    <!-- Summary metrics -->
+                    <div class="metrics-grid" id="metricsGrid">
+                        <div class="metric-card">
+                            <span class="metric-value" id="metricDocs">—</span>
+                            <span class="metric-label">Documents</span>
+                        </div>
+                        <div class="metric-card">
+                            <span class="metric-value" id="metricTriples">—</span>
+                            <span class="metric-label">Conversations</span>
+                        </div>
+                        <div class="metric-card">
+                            <span class="metric-value" id="metricDeduped">—</span>
+                            <span class="metric-label">After Dedup</span>
+                        </div>
+                        <div class="metric-card">
+                            <span class="metric-value" id="metricCrossDoc">—</span>
+                            <span class="metric-label">Cross-Doc</span>
+                        </div>
+                        <div class="metric-card">
+                            <span class="metric-value" id="metricQuality">—</span>
+                            <span class="metric-label">Avg Quality</span>
+                        </div>
+                        <div class="metric-card">
+                            <span class="metric-value" id="metricTime">—</span>
+                            <span class="metric-label">Duration</span>
+                        </div>
+                    </div>
+
+                    <p class="retrieval-info" id="retrievalInfo" style="margin: 0.5rem 0; color: #666; font-size: 0.85rem;"></p>
+
+                    <!-- Conversations Table preview -->
+                    <div class="results-table-container">
+                        <h3>Generated Conversations <span class="count-badge" id="qaCount"></span></h3>
+                        <div class="table-wrapper">
+                            <table class="results-table" id="qaTable">
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Question</th>
+                                        <th>Answer</th>
+                                        <th>Follow-up Q</th>
+                                        <th>Source</th>
+                                        <th>Type</th>
+                                        <th>Quality</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="qaTableBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Actions -->
+                    <div class="card-actions">
+                        <button class="btn btn-primary" id="exportExcelBtn">Export Excel</button>
+                        <button class="btn btn-outline" id="exportBtn">Export JSON</button>
+                        <button class="btn btn-outline" id="newRunBtn">New Run</button>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>

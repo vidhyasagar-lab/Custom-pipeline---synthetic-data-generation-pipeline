@@ -1,0 +1,511 @@
+/**
+ * Synthetic Data Generation Frontend — Application Logic
+ * Handles file upload, pipeline execution, SSE progress tracking, and results display.
+ */
+
+const API_BASE = '/api/v1';
+
+// ═══════════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════════
+
+let state = {
+    uploadedFiles: [],     // array of File objects
+    uploadedPaths: [],     // array of server paths after upload
+    runId: null,
+    eventSource: null,
+};
+
+// ═══════════════════════════════════════════════════════════════
+// DOM ELEMENTS
+// ═══════════════════════════════════════════════════════════════
+
+const $ = (sel) => document.querySelector(sel);
+const $$ = (sel) => document.querySelectorAll(sel);
+
+const elements = {
+    healthIndicator: $('#healthIndicator'),
+    uploadZone: $('#uploadZone'),
+    fileInput: $('#fileInput'),
+    fileInfo: $('#fileInfo'),
+    fileName: $('#fileName'),
+    fileSize: $('#fileSize'),
+    removeFile: $('#removeFile'),
+    startBtn: $('#startBtn'),
+    progressSection: $('#progressSection'),
+    progressFill: $('#progressFill'),
+    progressText: $('#progressText'),
+    runIdDisplay: $('#runIdDisplay'),
+    pipelineStages: $('#pipelineStages'),
+    logOutput: $('#logOutput'),
+    clearLogs: $('#clearLogs'),
+    resultsSection: $('#resultsSection'),
+    metricsGrid: $('#metricsGrid'),
+    qaTableBody: $('#qaTableBody'),
+    qaCount: $('#qaCount'),
+    exportBtn: $('#exportBtn'),
+    exportExcelBtn: $('#exportExcelBtn'),
+    newRunBtn: $('#newRunBtn'),
+};
+
+// ═══════════════════════════════════════════════════════════════
+// HEALTH CHECK
+// ═══════════════════════════════════════════════════════════════
+
+async function checkHealth() {
+    try {
+        const res = await fetch(`${API_BASE}/health`);
+        if (res.ok) {
+            elements.healthIndicator.className = 'health-indicator healthy';
+            elements.healthIndicator.querySelector('.health-text').textContent = 'Connected';
+        } else {
+            throw new Error('Not healthy');
+        }
+    } catch {
+        elements.healthIndicator.className = 'health-indicator unhealthy';
+        elements.healthIndicator.querySelector('.health-text').textContent = 'Disconnected';
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// FILE UPLOAD
+// ═══════════════════════════════════════════════════════════════
+
+function setupUpload() {
+    const zone = elements.uploadZone;
+    const input = elements.fileInput;
+
+    zone.addEventListener('click', () => input.click());
+
+    zone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        zone.classList.add('dragover');
+    });
+
+    zone.addEventListener('dragleave', () => {
+        zone.classList.remove('dragover');
+    });
+
+    zone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        zone.classList.remove('dragover');
+        const files = Array.from(e.dataTransfer.files).filter(f => f.name.endsWith('.docx') || f.name.endsWith('.pdf'));
+        if (files.length) handleFilesSelect(files);
+    });
+
+    input.addEventListener('change', () => {
+        const files = Array.from(input.files).filter(f => f.name.endsWith('.docx') || f.name.endsWith('.pdf'));
+        if (files.length) handleFilesSelect(files);
+    });
+
+    elements.removeFile.addEventListener('click', () => {
+        state.uploadedFiles = [];
+        state.uploadedPaths = [];
+        elements.fileInfo.style.display = 'none';
+        elements.uploadZone.style.display = 'block';
+        elements.startBtn.disabled = true;
+        input.value = '';
+    });
+}
+
+function handleFilesSelect(files) {
+    state.uploadedFiles = files;
+    const names = files.map(f => f.name).join(', ');
+    const totalSize = files.reduce((s, f) => s + f.size, 0);
+    elements.fileName.textContent = files.length === 1 ? files[0].name : `${files.length} files: ${names}`;
+    elements.fileSize.textContent = formatBytes(totalSize);
+    elements.fileInfo.style.display = 'flex';
+    elements.uploadZone.style.display = 'none';
+    elements.startBtn.disabled = false;
+}
+
+function formatBytes(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PIPELINE EXECUTION
+// ═══════════════════════════════════════════════════════════════
+
+async function startPipeline() {
+    elements.startBtn.disabled = true;
+    elements.startBtn.textContent = 'Uploading...';
+
+    try {
+        // Step 1: Upload document(s)
+        let uploadedPaths = [];
+
+        if (state.uploadedFiles.length === 1) {
+            const formData = new FormData();
+            formData.append('file', state.uploadedFiles[0]);
+            const uploadRes = await fetch(`${API_BASE}/upload-document`, {
+                method: 'POST',
+                body: formData,
+            });
+            if (!uploadRes.ok) {
+                const err = await uploadRes.json();
+                throw new Error(err.detail || 'Upload failed');
+            }
+            const uploadData = await uploadRes.json();
+            uploadedPaths = [uploadData.path];
+        } else {
+            const formData = new FormData();
+            for (const file of state.uploadedFiles) {
+                formData.append('files', file);
+            }
+            const uploadRes = await fetch(`${API_BASE}/upload-documents`, {
+                method: 'POST',
+                body: formData,
+            });
+            if (!uploadRes.ok) {
+                const err = await uploadRes.json();
+                throw new Error(err.detail || 'Upload failed');
+            }
+            const uploadData = await uploadRes.json();
+            uploadedPaths = uploadData.paths;
+        }
+
+        state.uploadedPaths = uploadedPaths;
+
+        // Step 2: Start async pipeline
+        elements.startBtn.textContent = 'Starting pipeline...';
+
+        const config = {
+            document_paths: uploadedPaths,
+            quality_threshold: parseFloat($('#qualityThreshold').value),
+            max_retries: parseInt($('#maxRetries').value),
+        };
+
+        const genRes = await fetch(`${API_BASE}/generate/async`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(config),
+        });
+
+        if (!genRes.ok) {
+            const err = await genRes.json();
+            throw new Error(err.detail || 'Pipeline start failed');
+        }
+
+        const genData = await genRes.json();
+        state.runId = genData.run_id;
+
+        // Show progress section
+        showProgressSection();
+        connectSSE(state.runId);
+
+    } catch (err) {
+        alert(`Error: ${err.message}`);
+        elements.startBtn.disabled = false;
+        elements.startBtn.textContent = 'Start Generation';
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PROGRESS TRACKING (SSE + Polling fallback)
+// ═══════════════════════════════════════════════════════════════
+
+function showProgressSection() {
+    elements.progressSection.style.display = 'block';
+    elements.runIdDisplay.textContent = `Run: ${state.runId.slice(0, 8)}...`;
+    elements.logOutput.innerHTML = '';
+    updateProgress(0);
+
+    // Reset stages
+    $$('.stage').forEach((s) => {
+        s.className = 'stage';
+        s.querySelector('.stage-status').textContent = 'Waiting...';
+    });
+}
+
+function connectSSE(runId) {
+    // Small delay to let the backend register the tracker
+    setTimeout(() => {
+        const evtSource = new EventSource(`${API_BASE}/progress/${runId}`);
+        state.eventSource = evtSource;
+
+        evtSource.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            handleProgressEvent(data);
+        };
+
+        evtSource.onerror = () => {
+            evtSource.close();
+            // Fallback to polling
+            startPolling(runId);
+        };
+    }, 500);
+}
+
+function handleProgressEvent(event) {
+    switch (event.type) {
+        case 'phase_start':
+            setStageActive(event.phase_number);
+            addLog(`▶ Starting: ${event.phase}`, 'info');
+            updateProgress(event.progress_pct || 0);
+            break;
+
+        case 'phase_complete':
+            setStageComplete(event.phase_number);
+            addLog(`✓ Completed: ${event.phase}`, 'info');
+            updateProgress(event.progress_pct || 0);
+            break;
+
+        case 'step_start':
+            addLog(`  → ${event.step}`, 'info');
+            break;
+
+        case 'step_complete':
+            addLog(`  ✓ ${event.step}`, 'info');
+            break;
+
+        case 'log':
+            addLog(`  [${event.phase}] ${event.message}`, event.level);
+            break;
+
+        case 'pipeline_complete':
+            updateProgress(100);
+            addLog('═══ Pipeline completed successfully! ═══', 'info');
+            if (state.eventSource) state.eventSource.close();
+            // Fetch final results
+            fetchResults(state.runId);
+            break;
+
+        case 'pipeline_failed':
+            addLog(`✗ FAILED: ${event.error}`, 'error');
+            if (state.eventSource) state.eventSource.close();
+            elements.startBtn.disabled = false;
+            elements.startBtn.textContent = 'Retry';
+            break;
+
+        case 'stream_end':
+            if (state.eventSource) state.eventSource.close();
+            break;
+    }
+}
+
+function startPolling(runId) {
+    addLog('Switched to polling mode...', 'warning');
+    const interval = setInterval(async () => {
+        try {
+            const res = await fetch(`${API_BASE}/status/${runId}`);
+            const data = await res.json();
+
+            if (data.status === 'completed') {
+                clearInterval(interval);
+                updateProgress(100);
+                showResults(data);
+            } else if (data.status === 'failed') {
+                clearInterval(interval);
+                addLog(`Pipeline failed: ${data.errors?.join(', ')}`, 'error');
+                elements.startBtn.disabled = false;
+                elements.startBtn.textContent = 'Retry';
+            } else {
+                addLog(`Status: ${data.status}...`, 'info');
+            }
+        } catch {
+            // Keep polling
+        }
+    }, 3000);
+}
+
+function updateProgress(pct) {
+    elements.progressFill.style.width = `${pct}%`;
+    elements.progressText.textContent = `${pct}%`;
+}
+
+function setStageActive(phaseNumber) {
+    const stage = $(`.stage[data-phase="${phaseNumber}"]`);
+    if (stage) {
+        stage.className = 'stage active';
+        stage.querySelector('.stage-status').textContent = 'Running...';
+    }
+}
+
+function setStageComplete(phaseNumber) {
+    const stage = $(`.stage[data-phase="${phaseNumber}"]`);
+    if (stage) {
+        stage.className = 'stage completed';
+        stage.querySelector('.stage-status').textContent = 'Done';
+    }
+}
+
+function addLog(message, level = 'info') {
+    const entry = document.createElement('div');
+    entry.className = `log-entry ${level}`;
+    const time = new Date().toLocaleTimeString();
+    entry.innerHTML = `<span class="log-time">${time}</span> <span class="log-msg">${escapeHtml(message)}</span>`;
+    elements.logOutput.appendChild(entry);
+    elements.logOutput.scrollTop = elements.logOutput.scrollHeight;
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// RESULTS
+// ═══════════════════════════════════════════════════════════════
+
+async function fetchResults(runId) {
+    try {
+        const res = await fetch(`${API_BASE}/status/${runId}`);
+        const data = await res.json();
+        if (data.status === 'completed') {
+            showResults(data);
+        } else {
+            // Retry after delay
+            setTimeout(() => fetchResults(runId), 2000);
+        }
+    } catch (err) {
+        addLog(`Error fetching results: ${err.message}`, 'error');
+    }
+}
+
+function showResults(data) {
+    elements.resultsSection.style.display = 'block';
+
+    // Metrics
+    const summary = data.summary || {};
+    $('#metricDocs').textContent = summary.documents_processed || 1;
+    $('#metricTriples').textContent = summary.total_conversations || summary.total_triples || 0;
+    $('#metricDeduped').textContent = summary.after_dedup || 0;
+    $('#metricCrossDoc').textContent = summary.cross_document_conversations || 0;
+    $('#metricQuality').textContent = (summary.avg_quality_score || 0).toFixed(3);
+    $('#metricTime').textContent = `${(data.total_time_seconds || 0).toFixed(1)}s`;
+
+    // Retrieval info
+    const retrievalInfo = $('#retrievalInfo');
+    if (retrievalInfo) {
+        retrievalInfo.textContent = `Retrieval: ${data.retrieval_method || 'hybrid'} | Format: conversational (${summary.total_conversations || 0} multi-turn conversations)`;
+    }
+
+    // Conversations Table (prefer conversations, fallback to qa_triples)
+    const conversations = data.conversations || [];
+    const triples = data.qa_triples || [];
+    const displaySource = conversations.length > 0 ? 'conversations' : 'triples';
+
+    const count = displaySource === 'conversations' ? conversations.length : triples.length;
+    elements.qaCount.textContent = count;
+    elements.qaTableBody.innerHTML = '';
+    const displayCount = Math.min(count, 50);
+
+    for (let i = 0; i < displayCount; i++) {
+        let question, answer, followUpQ, sourceFile, qType, quality;
+
+        if (displaySource === 'conversations') {
+            const conv = conversations[i];
+            const msgs = conv.messages || [];
+            question = msgs[0]?.content || '';
+            answer = msgs[1]?.content || '';
+            followUpQ = msgs[2]?.content || '';
+            const meta = conv.metadata || {};
+            sourceFile = meta.source_file || '';
+            qType = meta.question_type || '—';
+            quality = meta.quality_score || 0;
+        } else {
+            const t = triples[i];
+            question = t.question || '';
+            answer = t.answer || '';
+            followUpQ = t.follow_up_q || '';
+            sourceFile = (t.retrieved_sources || [])[0] || '';
+            qType = t.question_type || '—';
+            quality = t.quality_score || 0;
+        }
+
+        const qualityClass = quality >= 0.8 ? 'high' : quality >= 0.5 ? 'medium' : 'low';
+        const shortSource = sourceFile.length > 15 ? sourceFile.slice(0, 12) + '...' : sourceFile;
+
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>${i + 1}</td>
+            <td>${escapeHtml(question.slice(0, 100))}${question.length > 100 ? '...' : ''}</td>
+            <td>${escapeHtml(answer.slice(0, 80))}${answer.length > 80 ? '...' : ''}</td>
+            <td>${escapeHtml(followUpQ.slice(0, 60))}${followUpQ.length > 60 ? '...' : ''}</td>
+            <td title="${escapeHtml(sourceFile)}">${escapeHtml(shortSource)}</td>
+            <td>${escapeHtml(qType)}</td>
+            <td><span class="quality-badge ${qualityClass}">${quality.toFixed(2)}</span></td>
+        `;
+        elements.qaTableBody.appendChild(row);
+    }
+
+    // Reset start button
+    elements.startBtn.disabled = false;
+    elements.startBtn.textContent = 'Start Generation';
+}
+
+async function exportResults() {
+    if (!state.runId) return;
+    try {
+        const res = await fetch(`${API_BASE}/results/${state.runId}/export?format=json`);
+        if (!res.ok) throw new Error('Export failed');
+        const data = await res.json();
+
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `synthetic_data_${state.runId.slice(0, 8)}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+    } catch (err) {
+        alert(`Export error: ${err.message}`);
+    }
+}
+
+async function exportExcel() {
+    if (!state.runId) return;
+    try {
+        const res = await fetch(`${API_BASE}/results/${state.runId}/export?format=excel`);
+        if (!res.ok) throw new Error('Excel export failed');
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `synthetic_data_${state.runId.slice(0, 8)}.xlsx`;
+        a.click();
+        URL.revokeObjectURL(url);
+    } catch (err) {
+        alert(`Excel export error: ${err.message}`);
+    }
+}
+
+function resetForNewRun() {
+    state.runId = null;
+    if (state.eventSource) {
+        state.eventSource.close();
+        state.eventSource = null;
+    }
+    elements.progressSection.style.display = 'none';
+    elements.resultsSection.style.display = 'none';
+    elements.startBtn.disabled = !state.uploadedFile;
+    elements.startBtn.textContent = 'Start Generation';
+}
+
+// ═══════════════════════════════════════════════════════════════
+// INITIALIZATION
+// ═══════════════════════════════════════════════════════════════
+
+function init() {
+    setupUpload();
+
+    elements.startBtn.addEventListener('click', startPipeline);
+    elements.clearLogs.addEventListener('click', () => {
+        elements.logOutput.innerHTML = '';
+    });
+    elements.exportBtn.addEventListener('click', exportResults);
+    elements.exportExcelBtn.addEventListener('click', exportExcel);
+    elements.newRunBtn.addEventListener('click', resetForNewRun);
+
+    // Health check on load + periodic
+    checkHealth();
+    setInterval(checkHealth, 30000);
+}
+
+document.addEventListener('DOMContentLoaded', init);
